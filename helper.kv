@@ -1,9 +1,6 @@
 WindowManager:
 
-
 <WindowManager>:
-    homescreen: homescreen
-    payscreen: payscreen
     HomeScreen:
         id: homescreen
     PayScreen:
@@ -28,7 +25,6 @@ WindowManager:
         id:newpotscreen
     NewLoyaltyScreen:
         id:newloyaltyscreen
-
 <HomeScreen>:
     name: 'home'
     BoxLayout:
@@ -47,6 +43,10 @@ WindowManager:
         BoxLayout:
             orientation: 'vertical'
             MDLabel:
+                id:value
+                text: root.pay_amount
+                opacity: 0
+            MDLabel:
                 id: amount
                 text : "Amount: " + root.pay_amount + " GBP"
                 pos_hint: {'center_x': 0.5, 'center_y': 0.5}
@@ -63,26 +63,25 @@ WindowManager:
                     size_hint: 0.5, 0.3
                     halign: 'left'
                     on_press:
+                        root.manager.ids.payscreen.ids.amount.text = "Amount: " + root.pay_amount+ " GBP"
+                        root.manager.ids.payscreen.ids.value.text = root.pay_amount
                         root.manager.current = 'pay'
                 MDRaisedButton:
                     text: 'Get'
                     pos_hint: {'center_x': 0.8, 'center_y':0.3}
                     size_hint: 0.15, 0.3
                     halign: 'right'
-                    on_press:
-                        root.ids.amount.text = "Amount: " + root.get_transaction() + " GBP"
-                        root.manager.ids.payscreen.ids.paynow.disabled = False
-                        root.manager.ids.potscreen.ids.confirm.disabled = False
-                        root.ids.justpay.disabled = False
-                        root.clear_pots()
+                    on_press: root.get_amount()
         BoxLayout:
             orientation:'horizontal'
             MDRaisedButton:
+                id: loyalty
                 text: 'Loyalty'
                 pos_hint: {'center_x': 0.2, 'center_y':0.2}
                 size_hint: 0.1, 0.2
                 on_press: root.manager.current = 'loyalty'
             MDRaisedButton:
+                id: sort
                 text: 'Sort'
                 pos_hint: {'center_x': 0.5, 'center_y':0.2}
                 size_hint: 0.1, 0.2
@@ -97,20 +96,26 @@ WindowManager:
 <PayScreen>:
     name: 'pay'
     MDLabel:
+        id: value
+        opacity: 0
+    MDLabel:
         id: amount
-        text: "Amount: " + root.manager.ids.homescreen.pay_amount + " GBP"
         pos_hint: {'center_x': 0.5, 'center_y': 0.95}
         size_hint: 0.8, 0.15
         font_size: 20
         font_name: "Lcd.ttf"
+    MDLabel:
+        id:potname
+        pos_hint: {'center_x': 0.5, 'center_y':0.9}
+        size_hint: 0.2, 0.15
+        opacity: 0
     MDRaisedButton:
         id: paynow
         text: 'Pay Now'
         pos_hint: {'center_x': 0.5, 'center_y':0.5}
         size_hint: 0.5, 0.2
-        on_press:
-            root.pay_amount()
-            root.ids.paynow.disabled = True
+        on_press:root.just_pay(self, root.ids.value.text, root.manager.ids.loyaltypostscreen.ids.loyaltycode.text)
+
     BoxLayout:
         orientation: 'horizontal'
         MDRaisedButton:
@@ -130,7 +135,10 @@ WindowManager:
     BoxLayout:
         orientation: 'vertical'
         MDLabel:
-            text: "Amount: " + root.manager.ids.homescreen.pay_amount + " GBP"
+            id:value
+            opacity: 0
+        MDLabel:
+            id: amount
             pos_hint: {'center_x': 0.5, 'center_y': 0.8}
             size_hint: 0.8, 0.2
             font_name: "Lcd.ttf"
@@ -169,11 +177,7 @@ WindowManager:
             pos_hint: {'center_x': 0.5, 'center_y':0.4}
             size_hint: 0.5, 0.1
             halign: 'center'
-            on_press:
-                root.manager.current = 'potpay'
-                root.manager.ids.payscreen.pay_amount()
-                root.ids.confirm.disabled = True
-                root.manager.ids.homescreen.ids.justpay.disabled = True
+            on_press:root.confirm_pay(self,root.ids.potname.text, root.ids.value.text, root.manager.ids.loyaltypostscreen.ids.loyaltycode.text)
         MDRaisedButton:
             text: 'Cancel'
             pos_hint: {'center_x': 0.2, 'center_y':0.3}
@@ -182,6 +186,7 @@ WindowManager:
             on_press:
                 root.manager.current = 'home'
                 root.manager.ids.homescreen.clear_pots()
+                root.manager.ids.payscreen.ids.potname.text = "None"
         BoxLayout:
             orientation: 'horizontal'
             MDRaisedButton:
@@ -250,26 +255,39 @@ WindowManager:
                 pos_hint: {'center_x': 0.8, 'center_y':0.2}
                 size_hint: 0.1, 0.1
 
-<LoyaltyPreScreen@MDScreen>:
+<LoyaltyPreScreen>:
     name: 'preloyalty'
     BoxLayout:
         orientation: 'vertical'
         MDLabel:
+            id:loyalty
+            text: ''
+            opacity: 0
+        MDLabel:
             id: loyaltyname
+            text: ''
             pos_hint: {'center_x': 0.5, 'center_y':0.8}
             size_hint: 0.5, 0.1
-            halign: 'center'
+        MDLabel:
+            id: loyaltycode
+            text: ''
+            opacity: 0
         Image:
             id: loyaltybarcode
+            text: ''
             pos_hint: {'center_x': 0.5, 'center_y':0.5}
             size_hint: 0.9, 0.3
             halign: 'center'
         MDRaisedButton:
             text: 'Scan'
-            on_press: root.manager.current = 'postloyalty'
             pos_hint: {'center_x': 0.5, 'center_y':0.4}
             size_hint: 0.5, 0.1
             halign: 'center'
+            on_press:
+                root.scan_loyalty(root.ids.loyaltyname.text)
+                root.manager.current = 'postloyalty'
+                root.manager.ids.homescreen.ids.loyalty.disabled = True
+
         MDRaisedButton:
             text: 'Back'
             on_press: root.manager.current = 'loyalty'
@@ -279,11 +297,17 @@ WindowManager:
 
 <LoyaltyPostScreen@MDScreen>:
     name: 'postloyalty'
-    MDRaisedButton:
-        text: 'Proceed'
-        on_press: root.manager.current = 'home'
-        pos_hint: {'center_x': 0.5, 'center_y':0.5}
-        size_hint: 0.5, 0.2
+    BoxLayout:
+        orientation: 'vertical'
+        MDLabel:
+            id: loyaltycode
+            text: ''
+            opacity: 0
+        MDRaisedButton:
+            text: 'Proceed'
+            on_press: root.manager.current = 'home'
+            pos_hint: {'center_x': 0.5, 'center_y':0.5}
+            size_hint: 0.5, 0.2
     BoxLayout:
         orientation: 'horizontal'
         name: 'postloyalty'
@@ -316,20 +340,35 @@ WindowManager:
 
 <SortScreen>:
     name: 'sort'
-    MDTopAppBar:
-        title: "Pot"
-        pos_hint: {"top":0.9}
-        left_action_items: [["menu", lambda x: root.dropdown(x)]]
-    MDRaisedButton:
-        id: menu
-        text: "Press me"
-        pos_hint: {'center_x':0.5, 'center_y':0.7}
-        on_release: root.dropdown(self)
-    MDRaisedButton:
-        text: 'Home'
-        on_press: root.manager.current = 'home'
-        pos_hint: {'center_x': 0.5, 'center_y':0.5}
-        size_hint: 0.1, 0.1
+    BoxLayout:
+        orientation: 'vertical'
+        MDTopAppBar:
+            title: "Pot"
+            pos_hint: {"top":0.9}
+            left_action_items: [["menu", lambda x: root.dropdown(x)]]
+        MDRaisedButton:
+            id: menu
+            text: "Press me"
+            pos_hint: {'center_x':0.5, 'center_y':0.7}
+            on_release: root.dropdown(self)
+        MDRaisedButton:
+            text: 'Home'
+            on_press: root.manager.current = 'home'
+            pos_hint: {'center_x': 0.5, 'center_y':0.5}
+            size_hint: 0.1, 0.1
+        BoxLayout:
+            orientation: 'horizontal'
+            MDRaisedButton:
+                text:"Show"
+                pos_hint: {'center_x': 0.8, 'center_y':0.2}
+                size_hint: 0.1, 0.1
+                on_release:
+                    root.show_table()
+            MDRaisedButton:
+                text: 'Home'
+                on_press: root.manager.current = 'home'
+                pos_hint: {'center_x': 0.2, 'center_y':0.2}
+                size_hint: 0.1, 0.1
 <NewPotScreen>:
     name: 'newpot'
     BoxLayout:
@@ -346,6 +385,7 @@ WindowManager:
                         pos_hint: {'center_x': 0.2, 'center_y':0.95}
                         on_press:
                             root.load_names()
+                            self.disabled = True
             ScrollView:
                 StackLayout:
                     MDRaisedButton:
@@ -354,6 +394,7 @@ WindowManager:
                         pos_hint: {'center_x': 0.5, 'center_y':0.95}
                         on_press:
                             root.load_limits()
+                            self.disabled = True
             ScrollView:
                 StackLayout:
                     MDRaisedButton:
@@ -362,6 +403,7 @@ WindowManager:
                         pos_hint: {'center_x': 0.8, 'center_y':0.95}
                         on_press:
                             root.load_rems()
+                            self.disabled = True
         MDTextField:
             id: potname
             hint_text: "Enter pot name"
@@ -387,6 +429,7 @@ WindowManager:
                 on_press:
                     root.add_pot(root.ids.potname.text, root.ids.potlimit.text)
                     root.manager.current = 'home'
+                    root.manager.ids.homescreen.load_new_pot(root.ids.potname.text)
             MDRaisedButton:
                 text: 'Cancel'
                 pos_hint: {'center_x': 0.8, 'center_y':0.3}
@@ -428,6 +471,7 @@ WindowManager:
                 on_press:
                     root.add_loyalty(root.ids.loyaltyname.text, root.ids.loyaltycode.text)
                     root.manager.current = 'loyalty'
+                    root.manager.ids.loyaltyscreen.load_new_loyalty(root.ids.loyaltyname.text)
             MDRaisedButton:
                 text: 'Cancel'
                 pos_hint: {'center_x': 0.8, 'center_y':0.3}
