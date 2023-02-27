@@ -46,13 +46,7 @@ def make_payment(client_id, client_secret, amount, batch_id):
         }
     )
 
-    # Check the response to see if the payment was successful
-    if response.status_code == 201:
-        response_text = "Payment sent successfully!"
-    else:
-        response_text = f"Payment failed: {response.status_code}"
-
-    return access_token, response_text
+    return response
 
 
 def make_requests(access_token):

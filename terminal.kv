@@ -1,0 +1,49 @@
+WindowManager:
+<WindowManager>:
+    WelcomeScreen:
+        id: welcomescreen
+    MainScreen:
+        id: mainscreen
+
+<WelcomeScreen>:
+    name: 'welcomescreen'
+    MDRaisedButton:
+        text: 'Connect'
+        on_press: root.initiate()
+<MainScreen>:
+    name: 'mainscreen'
+    BoxLayout:
+        orientation: 'vertical'
+        MDLabel:
+            id:value
+            text: root.pay_amount
+            opacity: 0
+        MDLabel:
+            id: amount
+            text : "Amount: " + root.pay_amount + " GBP"
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+            halign: 'center'
+            size_hint: 0.8, 0.1
+            font_size: 20
+        MDLabel:
+            id: label
+        MDRaisedButton:
+            text: 'Get Amount'
+            pos_hint: {'center_x': 0.8, 'center_y':0.3}
+            size_hint: 0.15, 0.3
+            halign: 'right'
+            on_press: root.get_amount()
+        MDRaisedButton:
+            id: paynow
+            text: 'Pay Now'
+            pos_hint: {'center_x': 0.5, 'center_y':0.5}
+            size_hint: 0.5, 0.2
+            on_press:root.pay()
+        MDRaisedButton:
+            text: 'Get Client'
+            pos_hint: {'center_x': 0.2, 'center_y':0.3}
+            size_hint: 0.15, 0.3
+            halign: 'right'
+            on_press: root.get_client_data()
+        MDTextField:
+            id: msg
