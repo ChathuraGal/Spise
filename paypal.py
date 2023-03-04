@@ -17,36 +17,39 @@ def make_payment(client_id, client_secret, amount, batch_id):
         }
     )
 
-    access_token = response.json()["access_token"]
+    try:
+        access_token = response.json()["access_token"]
 
-    # Make a payment using the access token
-    response = requests.post(
-        "https://api.sandbox.paypal.com/v1/payments/payouts",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "sender_batch_header": {
-                "sender_batch_id": batch_id,
-                "email_subject": "You have a payout!",
+        # Make a payment using the access token
+        response = requests.post(
+            "https://api.sandbox.paypal.com/v1/payments/payouts",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
             },
-            "items": [
-                {
-                    "recipient_type": "EMAIL",
-                    "amount": {
-                        "value": f"{str(amount)}",
-                        "currency": "GBP",
-                    },
-                    "receiver": "receiver@example.com",
-                    "note": "Thanks for your business!",
-                    "sender_item_id": "item_id_123",
-                }
-            ]
-        }
-    )
+            json={
+                "sender_batch_header": {
+                    "sender_batch_id": batch_id,
+                    "email_subject": "You have a payout!",
+                },
+                "items": [
+                    {
+                        "recipient_type": "EMAIL",
+                        "amount": {
+                            "value": f"{str(amount)}",
+                            "currency": "GBP",
+                        },
+                        "receiver": "receiver@example.com",
+                        "note": "Thanks for your business!",
+                        "sender_item_id": "item_id_123",
+                    }
+                ]
+            }
+        )
+        return response
+    except:
+        return None
 
-    return response
 
 
 def make_requests(access_token):

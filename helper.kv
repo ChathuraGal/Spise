@@ -45,29 +45,19 @@ WindowManager:
             size_hint: 0.05, 0.15
             pos_hint: {'center_x': 0.8, 'center_y':0.3}
             on_press:
-                root.manager.current = 'home'
-                root.manager.ids.homescreen.load_pots()
 <HomeScreen>:
     name: 'home'
     BoxLayout:
         orientation:'vertical'
-        ScrollView:
-            StackLayout:
-                id: potlayout
         BoxLayout:
             orientation: 'vertical'
-            MDLabel:
-                id: amount
-                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-                halign: 'center'
-                size_hint: 0.8, 0.1
-                font_size: 20
-                font_name: "Lcd.ttf"
+            ScrollView:
+                StackLayout:
             BoxLayout:
                 orientation: 'horizontal'
                 MDRaisedButton:
                     text:"Show"
-                    pos_hint: {'center_x': 0.2, 'center_y':0.2}
+                    pos_hint: {'center_x': 0.2, 'center_y':0.3}
                     size_hint: 0.15, 0.3
                     on_release:
                         root.manager.current = 'show'
@@ -78,15 +68,21 @@ WindowManager:
                     pos_hint: {'center_x': 0.5, 'center_y':0.3}
                     size_hint: 0.15, 0.3
                     halign: 'left'
-                    on_press:
-                        root.manager.current = 'justpay'
-                        root.manager.ids.justpayscreen.ids.sort.text = "Sort("+str(app.unsorted)+")"
+                    on_press: root.manager.current = 'justpay'
+
                 MDRaisedButton:
                     text: 'Get'
                     pos_hint: {'center_x': 0.8, 'center_y':0.3}
                     size_hint: 0.15, 0.3
                     halign: 'right'
                     on_press: root.get_amount()
+            MDLabel:
+                id: amount
+                pos_hint: {'center_x': 0.5, 'center_y': 0.25}
+                halign: 'center'
+                size_hint: 0.8, 0.1
+                font_size: 20
+                font_name: "Lcd.ttf"
         BoxLayout:
             orientation:'horizontal'
             MDRaisedButton:
@@ -99,7 +95,6 @@ WindowManager:
 
             MDRaisedButton:
                 id: sort
-                text: 'Sort(' + str(app.unsorted)+ ')'
                 pos_hint: {'center_x': 0.5, 'center_y':0.2}
                 size_hint: 0.1, 0.2
                 on_press:
@@ -126,16 +121,17 @@ WindowManager:
         text: 'Pay Now'
         pos_hint: {'center_x': 0.5, 'center_y':0.5}
         size_hint: 0.5, 0.2
-        on_press:root.just_pay(self)
+        on_press:root.pay_now(self)
 
     BoxLayout:
         orientation: 'horizontal'
         MDRaisedButton:
             id: sort
-            text: 'Sort('+str(app.unsorted)+')'
             pos_hint: {'center_x': 0.8, 'center_y':0.2}
             size_hint: 0.1, 0.2
-            on_press: root.manager.current = 'sort'
+            on_press:
+                root.manager.current = 'sort'
+                root.manager.ids.sortscreen.show_table()
         MDRaisedButton:
             text: 'Home'
             on_press: root.manager.current = 'home'
@@ -199,7 +195,6 @@ WindowManager:
             orientation: 'horizontal'
             MDRaisedButton:
                 id: sort
-                text: 'Sort('+str(app.unsorted)+')'
                 on_press: root.manager.current = 'sort'
                 pos_hint: {'center_x': 0.2, 'center_y':0.2}
                 size_hint: 0.1, 0.1
@@ -239,7 +234,7 @@ WindowManager:
     BoxLayout:
         orientation: 'horizontal'
         MDRaisedButton:
-            text: 'Sort('+str(app.unsorted)+')'
+            id: sort
             on_press: root.manager.current = 'sort'
             pos_hint: {'center_x': 0.2, 'center_y':0.2}
             size_hint: 0.1, 0.1
@@ -268,7 +263,7 @@ WindowManager:
         BoxLayout:
             orientation: 'horizontal'
             MDRaisedButton:
-                text: 'Sort('+str(app.unsorted)+')'
+                id: sort
                 pos_hint: {'center_x': 0.2, 'center_y':0.2}
                 size_hint: 0.1, 0.1
                 on_press:
@@ -325,6 +320,9 @@ WindowManager:
 
 <SortScreen>:
     name: 'sort'
+    BoxLayout:
+        id: pie
+        size_hint_y : 0.5
 
 <NewPotScreen>:
     name: 'newpot'
