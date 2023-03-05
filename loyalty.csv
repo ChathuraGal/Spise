@@ -1,8 +1,9 @@
-﻿Name,Code
-BP,2.64E+11
-Nectar,2.37E+11
-Club,2.64E+11
-Shell,1.23E+11
-Coop,5.47E+11
-Argos,1.23E+11
-Waitrose,9.88E+11
+﻿Name,Code,username
+BP,264000000000,user1
+Nectar,237000000000,user1
+Club,264000000000,user1
+Shell,123000000000,user1
+Coop,547000000000,user1
+Argos,123000000000,user1
+Waitrose,988000000000,user1
+BP,123321123321,user2
