@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "spiseapp-379712",
+  "private_key_id": "430b36271b31fbd6355826dab0c4ebdad8712f9c",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDHRTpgepd/lajd\nuHLmbdl7Kv/CbtqsPwvt1UQXvjpmLc5dI4ZsV7bMF1KovvayrdbCeadWz3qQoMNQ\nH+KyorbpbLR1jJ6bp+u/nT2FUN9QOcPfbNR7H2rhdCucqeOQ+Y88oBMitsQeZdYe\ncnwx+inaonFctOj1zokYgDbAxS8/bQOvrkRZrgWatD9zBRDNJ+AZItbZj5aVFtn4\nFkuwJD1dvogT+rqTzlgEJzOhj7BCNXSttwbw5Tzj8aTvbnuXBTw2UCASXGSwd5K7\nXQRC1B6qRnE0E7G+MIskzZXzO93KSjqNQrU+q5zIa2ruuZFXr2YhX0tIfyWuJFv2\nCazqvF8xAgMBAAECggEAANPZ8GD3ScQv2C02Fkc6LNJFZKPRjFSTXUX89eedgM4g\n5MR11Z5Zon2to14Y/S35TdkefPRN9dV3v4NFDZPdFEQWIxorOx9BPIxPye1yN/g9\ncYCXXfmH7UQZEu9RBB7yiCsWrpa5YseZJ4rh1tKgo4lNf406yHE2ot+UGqHXATmV\n9Quxi4pOunP/YBY75CIATqU+ATzrKjhunBXLjDH/SuVC5ysn+j0I4xa/lAts1U38\nN+bTe3T72/aljuowRw/ylK8rqy1h1s/eOY72MWDT50iA6ZqWSBBHpI9lNBgVLA8O\nJkXEUuO0wU1G+6KRQk88fGP7n7hA1ZVWDIZUxJ3RqQKBgQD2tBezoTGMOOHhDE6z\n87Mr3B2QoemStLtLEUAeQXC3YMkQCLVfxYZ1s0ilweJiw5UxeYXvydrurxvNLO77\nZ6AHKeCO117fi1pypn5JIrxNcsjO3wlrWdzbflx3N5cu9rMve1VfWBdDaLgPwdr7\n0dcAFfyELg84hRxDC/rViBeaJQKBgQDOx458Hv5WfdPIxDMDTeDF0KX5u9/0EaXe\nXcFcAEuZNuluO9Ac00ktSninxzfXtBjzhBnXZU78RFmBoxG9ZtXx1BOvAKASXasf\nDaPdIzV+pzIztewgeC22EkLwfyz58QFKuPZWYXTcHBqN5LWcYSqUfCFkdpMl6CBt\nsv0qNRl1HQKBgQCWnmVKGkPx5Fij2avDWiotwPmb7/52vzkKH8IRtspmawTWcTqq\n+iGZgpf7+1+IBPj1d8g6Gfc8elRy89gETcP6G6sqCnu155KVJOk9JaPpdQb8pldN\n31Nj/sXdU2dOGPhVKOt6hoHNegXGOQjFbdviBYph+Oz6COq0VIAUFj6ysQKBgQC0\nKz6kOaEknYg9w24rb9zsn2su2Rs+n23l/czvq7YzLpxgFy+zHgoBs4TDs5qdkOe4\nrp6Rhk03ExrmEL7xR7wcdMwdzK6ssf7bFNh1YytGSso8MkQm2nAB15GJ2VXIBc05\nXUYOZ+YZr0cX4XK4ahVewXWbApIeEk7HJpDeCNxApQKBgQC6bZZ1H9kVuJyGzkd4\nCmJnCQZUnExHk0VQJG3oIc14SjaoiOm1+Bi8H9gOq7nR4ie9nPKEAq9kU3CEtvKC\nigkUTNi3isAUwPpHsRIYqVV7SpW/UHtR7xG2hormK1GIbkQ7dK8Od51gQtFHNd3L\nEOyl/6YbZyRyZIS+fxc5OpuHiA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "spiseservices@spiseapp-379712.iam.gserviceaccount.com",
+  "client_id": "108209282186979927974",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/spiseservices%40spiseapp-379712.iam.gserviceaccount.com"
+}

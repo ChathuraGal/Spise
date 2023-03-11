@@ -1,18 +1,10 @@
 import socket
-import subprocess
-import mysql.connector
-from google.oauth2.gdch_credentials import ServiceAccountCredentials
-from kivy.uix.anchorlayout import AnchorLayout
-from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
-from kivy.uix.scrollview import ScrollView
 from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDFlatButton, MDRaisedButton
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.label import MDLabel
-from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.datatables import MDDataTable
@@ -33,8 +25,8 @@ import threading
 import pygal
 import matplotlib.pyplot as plt
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import openpyxl
+
 
 SCAN_TIME = 5
 Window.size = (300, 500)  # for mobile phones only
@@ -50,31 +42,18 @@ loyalty_name = 'None'
 loyalty_code = 111111111111
 unsorted = 0
 
-service_account = gspread.service_account('api_key.json')
-#db = service_account.open('SpiseData')
+wb = openpyxl.load_workbook('data.xlsx')
 
-scope = ['https://www.googleapis.com/auth/spreadsheets',
-                 'https://www.googleapis.com/auth/drive.readonly']
+trans_sheet = wb["transactions"]
+pots_sheet = wb["pots"]
+loyalty_sheet = wb["loyalty"]
+users_sheet = wb["users"]
 
-creds = ServiceAccountCredentials.from_json_keyfile_name('api_key.json', scope)
+users_trans = pd.read_excel('data.xlsx', sheet_name='transactions')
+users_pots = pd.read_excel('data.xlsx', sheet_name='pots')
+users_loyalty = pd.read_excel('data.xlsx', sheet_name='loyalty')
+users_data = pd.read_excel('data.xlsx', sheet_name='users')
 
-client = gspread.authorize(creds)
-
-db = client.open('SpiseData')
-trans_sheet = db.worksheet("transactions")
-pots_sheet = db.worksheet("pots")
-loyalty_sheet = db.worksheet("loyalty")
-users_sheet = db.worksheet("users")
-
-#trans_sheet = client.open('SpiseData').transactions
-#pots_sheet = client.open('SpiseData').pots
-#loyalty_sheet = client.open('SpiseData').loyalty
-#users_sheet = client.open('SpiseData').users
-
-users_pots = pd.DataFrame(pots_sheet.get_all_records())
-users_trans = pd.DataFrame(trans_sheet.get_all_records())
-users_loyalty = pd.DataFrame(loyalty_sheet.get_all_records())
-users_data = pd.DataFrame(users_sheet.get_all_records())
 users_names = users_data['username'].tolist()
 
 pots = pd.DataFrame()
@@ -88,8 +67,6 @@ user_name = ''
 TERMINAL_IP = socket.gethostbyname(socket.gethostname())
 PORT_NUMBER = 5005
 SIZE = 1024
-#API_KEY = 'AIzaSyAW2m9UcPtcoPGjsvIbbcVTlr2AKHvdoDQ'
-#service_email = 'spiseservices@spiseapp-379712.iam.gserviceaccount.com'
 
 
 def sender():
@@ -144,13 +121,17 @@ class LoadScreen(MDScreen):
 class SignInScreen(MDScreen):
     def signin(self, username):
         global user_credentials, user_name, users_sheet, users_names, users_data
-        users_data = pd.DataFrame(users_sheet.get_all_records())
+        users_data = pd.read_excel('data.xlsx', sheet_name='users')
         if username in users_names:
-            user_row = users_sheet.find(username).row
-            user_credentials = users_sheet.cell(user_row, 3).value + users_sheet.cell(user_row, 4).value #3,4 are column numbers
+            for row in users_sheet.iter_rows():
+                if username in row[0].value:
+                    user_row = row[0].row
+                    break
+            user_credentials = users_sheet.cell(row=user_row, column=3).value + \
+                               users_sheet.cell(row=user_row, column=4).value #3,4 are column numbers
             self.manager.current = 'home'
             user_name = username
-            self.manager.ids.homescreen.load_home()
+            self.manager.ids.homescreen.load_pots()
             self.manager.ids.loyaltyscreen.load_loyalty()
         else:
             self.button = MDFlatButton(text='Try again', on_release=self.retry, pos_hint={'center_x': 0.5})
@@ -185,14 +166,19 @@ class HomeScreen(MDScreen):
         self.manager.ids.loyaltyscreen.clear_loyalty()
         pot_selected = 'None'
 
-    def update_data(self):
-        global trans_sheet, pots_sheet, loyalty_sheet, users_sheet, trans, pots, loyalty, unsorted, \
+    def load_data(self):
+        global trans_sheet, pots_sheet, loyalty_sheet, users_sheet, trans, pots, loyalty, unsorted, wb, \
             users_pots, users_trans, users_loyalty, users_data, users_names, loyalty_names, pot_names, user_name
 
-        users_trans = pd.DataFrame(trans_sheet.get_all_records())
-        users_pots = pd.DataFrame(pots_sheet.get_all_records())
-        users_loyalty = pd.DataFrame(loyalty_sheet.get_all_records())
-        users_data = pd.DataFrame(users_sheet.get_all_records())
+        trans_sheet = wb["transactions"]
+        pots_sheet = wb["pots"]
+        loyalty_sheet = wb["loyalty"]
+        users_sheet = wb["users"]
+
+        users_trans = pd.read_excel('data.xlsx', sheet_name='transactions')
+        users_pots = pd.read_excel('data.xlsx', sheet_name='pots')
+        users_loyalty = pd.read_excel('data.xlsx', sheet_name='loyalty')
+        users_data = pd.read_excel('data.xlsx', sheet_name='users')
 
         trans = users_trans[users_trans['username'] == user_name]
         pots = users_pots[users_pots['username'] == user_name]
@@ -203,49 +189,54 @@ class HomeScreen(MDScreen):
         users_names = users_data['username'].tolist()
         unsorted = trans[trans["pot"] == "None"].shape[0]
 
+    def update_data(self):
+        global pots_sheet, pot_names, wb
         for name in pot_names:
-            trans_spend = trans.groupby('pot').agg({'amount': ['sum', 'count']})
-            pot_spend = trans_spend.loc[name][0]
-            pot_weight = trans_spend.loc[name][1]
             pot_limit = pots[pots["Name"] == name]["Limit"].values[0]
-            pot_usage = '{:.0%}'.format(float(pot_spend) / float(pot_limit))
+            try:
+                trans_spend = trans.groupby('pot').agg({'amount': ['sum', 'count']})
+                pot_spend = trans_spend.loc[name][0]
+                pot_weight = trans_spend.loc[name][1]
+                pot_limit = pots[pots["Name"] == name]["Limit"].values[0]
+                pot_usage = '{:.0%}'.format(float(pot_spend) / float(pot_limit))
+            except:
+                pot_spend = pot_limit - pots[pots["Name"] == name]["Balance"].values[0]
+                pot_weight = pots[pots["Name"] == name]["Weight"].values[0]
+                pot_usage = pots[pots["Name"] == name]["Usage"].values[0]
 
-        for j in range(len(pots_sheet.findall(name))):
-            if pots_sheet.cell(pots_sheet.findall(name)[j].row, 6).value == user_name:
-                user_pot_row = pots_sheet.findall(name)[j].row
-                pots_sheet.update(f'C{user_pot_row}', pot_limit - pot_spend)
-                pots_sheet.update(f'D{user_pot_row}',
-                                  '{:.0%}'.format(round(float(pot_spend) / float(pot_limit), 2)))
-                pots_sheet.update(f'E{user_pot_row}', int(pot_weight))
+            for row in pots_sheet.iter_rows():
+                if name in row[0].value and user_name in row[5].value:
+                    pots_sheet[f'C{row[0].row}'] = pot_limit - pot_spend
+                    pots_sheet[f'D{row[0].row}'] = pot_usage
+                    pots_sheet[f'E{row[0].row}'] = int(pot_weight)
+                    break
 
-    def load_home(self):
+        wb.save('data.xlsx')
+
+    def load_pots(self):
         global unsorted, pot_names, user_name, users_pots, users_trans, trans, pots
-        self.update_data()
+        self.load_data()
         #pots.sort_values(by='Weight', ascending=False, inplace=True)
         self.update_sort_buttons()
 
         for name in pot_names:
-            trans_spend = trans.groupby('pot').agg({'amount': ['sum', 'count']})
-            pot_spend = trans_spend.loc[name][0]
-            pot_weight = trans_spend.loc[name][1]
             pot_limit = pots[pots["Name"] == name]["Limit"].values[0]
+            try:
+                trans_spend = trans.groupby('pot').agg({'amount': ['sum', 'count']})
+                pot_spend = trans_spend.loc[name][0]
+                pot_weight = trans_spend.loc[name][1]
+                pot_usage = '{:.0%}'.format(float(pot_spend)/float(pot_limit))
+            except: # in case there are no transactions for a certain pot
+                pot_weight = pots[pots['Name'] == name]['Weight'].values[0]
+                pot_usage = pots[pots['Name'] == name]['Usage'].values[0]
 
-            pot_usage = '{:.0%}'.format(float(pot_spend)/float(pot_limit))
-
-            for j in range(len(pots_sheet.findall(name))):
-                if pots_sheet.cell(pots_sheet.findall(name)[j].row, 6).value == user_name:
-                    user_pot_row = pots_sheet.findall(name)[j].row
-                    pots_sheet.update(f'C{user_pot_row}', pot_limit - pot_spend)
-                    pots_sheet.update(f'D{user_pot_row}',
-                                      '{:.0%}'.format(round(float(pot_spend)/float(pot_limit), 2)))
-                    pots_sheet.update(f'E{user_pot_row}', int(pot_weight))
             button = MDRaisedButton(id=name, text=f'{name}-{pot_usage} ({int(pot_weight)})')
             button.bind(on_release=lambda btn=name: self.button_press(btn))
             button.disabled = True
             self.pot_layout.add_widget(button)
         self.add_widget(self.pot_layout)
 
-    def unload_home(self):
+    def unload_pots(self):
         try:
             while True: #as long as there are buttons in the layout
                 self.pot_layout.remove_widget(self.pot_layout.children[0])
@@ -255,20 +246,20 @@ class HomeScreen(MDScreen):
 
     def button_press(self, btn):
         global pay_amount, pot_selected, unsorted, pots
-        self.update_data()
+        self.load_data()
         pot_selected = btn.id
+        pot_weight = pots[pots['Name'] == pot_selected]['Weight'].values[0]
+        pot_usage = pots[pots['Name'] == pot_selected]['Usage'].values[0]
         self.manager.current = 'potpay'
         self.manager.ids.potpayscreen.ids.sort.text = f"Sort({unsorted})"
         self.manager.ids.potpayscreen.ids.amount.text = "Amount: " + str(pay_amount) + " GBP"
         self.manager.ids.justpayscreen.ids.amount.text = "Amount: " + str(pay_amount) + " GBP"
-        self.manager.ids.potpayscreen.ids.potname.text = btn.text
-        self.manager.ids.potpaidscreen.ids.potname.text = btn.text
-        pot_limit = str(pots[pots["Name"] == btn.id]["Limit"].values[0])
-        #pot_limit = [user_pots[x]['Limit'] for x in range(len(user_pots)) if user_pots[x]['Name'] == btn.id][0]
+        self.manager.ids.potpayscreen.ids.potname.text = f'{pot_selected}-{pot_usage} ({int(pot_weight)})'
+        self.manager.ids.potpaidscreen.ids.potname.text = f'{pot_selected}-{pot_usage} ({int(pot_weight)})'
+        pot_limit = str(pots[pots["Name"] == pot_selected]["Limit"].values[0])
         self.manager.ids.potpayscreen.ids.potlimit.text = "Limit\n" + str(round(float(pot_limit), 2))
         self.manager.ids.potpaidscreen.ids.potlimit.text = "Limit\n" + str(round(float(pot_limit), 2))
-        pot_balance = str(pots[pots["Name"] == btn.id]["Balance"].values[0])
-        #pot_balance = [user_pots[x]['Balance'] for x in range(len(user_pots)) if user_pots[x]['Name'] == btn.id][0]
+        pot_balance = str(pots[pots["Name"] == pot_selected]["Balance"].values[0])
         self.manager.ids.potpayscreen.ids.potrem.text = "Balance\n" + str(round(float(pot_balance), 2))
         self.manager.ids.potpaidscreen.ids.potrem.text = "Balance\n" + str(round(float(pot_balance), 2))
         self.clear_pots()
@@ -276,27 +267,13 @@ class HomeScreen(MDScreen):
         return btn.text
 
     def update_pot_buttons(self):
-        global pots, pot_names, trans, user_name
-        self.update_data()
+        global pots, pot_names, trans, user_name, wb
+        self.load_data()
         #pots.sort_values(by='Weight', ascending=False, inplace=True)
-        for i, name in enumerate(pot_names):
-            trans_spend = trans.groupby('pot').agg({'amount': ['sum', 'count']})
-            pot_spend = trans_spend.loc[name][0]
-            pot_weight = trans_spend.loc[name][1]
-            pot_limit = pots[pots['Name'] == name]['Limit'].values[0]
-            pot_usage = '{:.0%}'.format(float(pot_spend) / float(pot_limit))
-
-            for j in range(len(pots_sheet.findall(name))):
-                if pots_sheet.cell(pots_sheet.findall(name)[j].row, 6).value == user_name:
-                    user_pot_row = pots_sheet.findall(name)[j].row
-                    pots_sheet.update(f'C{user_pot_row}', pot_limit - pot_spend)
-                    pots_sheet.update(f'D{user_pot_row}',
-                                      '{:.0%}'.format(round(float(pot_spend)/float(pot_limit), 2)))
-                    pots_sheet.update(f'E{user_pot_row}', int(pot_weight))
+        for i, name in enumerate(reversed(pot_names)):
             pot_usage = pots[pots["Name"] == name]["Usage"].values[0]
             pot_weight = int(pots[pots["Name"] == name]["Weight"].values[0])
             self.pot_layout.children[i].text = f'{name}-{pot_usage} ({int(pot_weight)})'
-        self.update_data()
 
     def update_sort_buttons(self):
         global unsorted
@@ -333,6 +310,7 @@ class JustPayScreen(MDScreen):
             self.record_pay()
             #btn.disabled = True
             self.manager.current = 'home'
+            self.manager.ids.homescreen.update_pot_buttons()
             self.manager.ids.justpayscreen.ids.amount.text = "Amount: " + str(pay_amount) + " GBP"
             self.manager.ids.homescreen.ids.justpay.disabled = True
             self.manager.ids.homescreen.ids.loyalty.disabled = True
@@ -372,53 +350,52 @@ class JustPayScreen(MDScreen):
         return payment_success
 
     def record_pay(self):
-        global pay_amount, pot_selected, loyalty_code, unsorted, trans, pots, user_name, trans_sheet, users_pots
+        global pay_amount, pot_selected, loyalty_code, unsorted, trans, pots, user_name, trans_sheet, users_pots, wb
         now = datetime.now()
         dt_string = now.strftime("%Y-%m-%d %H:%M:%S")
-        #id = str(int(dt_string[:4] + dt_string[5:7] + dt_string[8:10] + dt_string[11:13]+ dt_string[14:16]+dt_string[-2:]))
-        lower = string.ascii_lowercase
-        upper = string.ascii_uppercase
-        numbers = '0123456789'
-        all = lower + upper + numbers
-        id = "".join(random.choice(all) for i in range(10))
+        lower, upper, numbers = string.ascii_lowercase, string.ascii_uppercase, '0123456789'
+        chars = lower + upper + numbers
+        trans_id = "".join(random.choice(chars) for i in range(10))
         try:
-            data_entry = [id, pay_amount, pot_selected, loyalty_code, dt_string, user_name]
-            trans_sheet.insert_row(data_entry, len(trans_sheet.get_all_records()) + 2)
+            data_entry = [trans_id, pay_amount, pot_selected, loyalty_code, dt_string, user_name]
+            trans_sheet.append(data_entry)
+            wb.save('data.xlsx')
             if pot_selected != "None":
-                check_string = "Transaction added successfully.\n Spent " + pay_amount +\
-                               " GBP\n from " + pot_selected + " Pot."
-
-                for j in range(len(pots_sheet.findall(pot_selected))):
-                    if pots_sheet.cell(pots_sheet.findall(pot_selected)[j].row, 6).value == user_name:
-                        user_pot_row = pots_sheet.findall(pot_selected)[j].row
-                        pots_sheet.update(f'C{user_pot_row}', float(pots_sheet.cell(user_pot_row, 3).value) - float(pay_amount))
-                        pots_sheet.update(f'E{user_pot_row}', float(pots_sheet.cell(user_pot_row, 5).value) + 1)
-                self.manager.ids.homescreen.update_data()
+                for row in pots_sheet.iter_rows():
+                    if pot_selected in row[0].value and user_name in row[5].value:
+                        user_pot_row = row[0].row
+                        pots_sheet[f'C{row[0].row}'] = pots_sheet[f'C{row[0].row}'].value - float(pay_amount)
+                        pots_sheet[f'E{row[0].row}'] = pots_sheet[f'E{row[0].row}'].value + 1
+                        break
+                wb.save('data.xlsx')
+                self.manager.ids.homescreen.load_data()
                 pot_limit = str(pots[pots["Name"] == pot_selected]["Limit"].values[0])
                 self.manager.ids.potpaidscreen.ids.potlimit.text = "Limit\n" + str(round(float(pot_limit), 2))
                 pot_balance = str(pots[pots["Name"] == pot_selected]["Balance"].values[0])
                 self.manager.ids.potpaidscreen.ids.potrem.text = "Balance\n" + str(round(float(pot_balance), 2))
-                pots_sheet.update(f'D{user_pot_row}',
-                                  '{:.0%}'.format(round((float(pot_limit)-float(pot_balance)) / float(pot_limit), 2)))
+                pots_sheet[f'D{user_pot_row}'] = '{:.0%}'.format(round((float(pot_limit)-float(pot_balance)) / float(pot_limit), 2))
                 pot_usage = pots[pots["Name"] == pot_selected]["Usage"].values[0]
                 pot_weight = int(pots[pots["Name"] == pot_selected]["Weight"].values[0])
                 self.manager.ids.potpaidscreen.ids.potname.text = f'{pot_selected}-{pot_usage} ({pot_weight})'
+                check_string = "Transaction added successfully.\n Spent " + pay_amount + \
+                               " GBP\n from " + pot_selected + " Pot."
             else:
+                self.manager.ids.homescreen.load_data()
+                unsorted = trans[trans["pot"] == "None"].shape[0]
                 check_string = "Transaction added successfully.\n Spent " + pay_amount + " GBP\n without choosing a pot"
         except:
             check_string = "Failed to update the transaction."
-        self.manager.ids.homescreen.update_pot_buttons()
-
         close_button = MDFlatButton(text="Close", on_release=self.close_record,
                                     pos_hint={'center_x': 0.2})
         sort_button = MDRaisedButton(text=f"Sort ({unsorted}) ", on_release=self.goto_sort,
                                      pos_hint={'center_x': 0.8})
 
-        self.dialog_record = MDDialog(title="Payment status",
-                               #text=response_text+"\n"+check_string,
-                               text = check_string,
+        self.dialog_record = MDDialog(title="Payment status", text = check_string,
                                size_hint=(0.7, 1), buttons=[close_button, sort_button])
         self.dialog_record.open()
+        self.manager.ids.homescreen.update_data()
+        wb.save('data.xlsx')
+        self.manager.ids.homescreen.update_pot_buttons()
 
     def send_pay(self):
         global user_credentials
@@ -471,11 +448,11 @@ class LoyaltyScreen(MDScreen):
     loyalty_layout = StackLayout()
 
     def read_loyalty(self):
-        self.manager.ids.homescreen.update_data()
+        self.manager.ids.homescreen.load_data()
 
     def clear_loyalty(self):
         global loyalty, loyalty_names, user_name, users_loyalty
-        self.manager.ids.homescreen.update_data()
+        self.manager.ids.homescreen.load_data()
         try:
             for i in range(len(loyalty_names)):
                 self.loyalty_layout.children[i].disabled = False
@@ -483,8 +460,9 @@ class LoyaltyScreen(MDScreen):
             pass
 
     def save_barcode(self, name, code):
+        global user_name
         barcode = EAN13(code, writer=ImageWriter())
-        barcode.save(name)
+        barcode.save(f'barcodes/{user_name}/{name}')
 
     def load_loyalty(self):
         global loyalty, loyalty_names
@@ -522,6 +500,7 @@ class ScanScreen(MDScreen):
     def scan_loyalty(self):
         self.manager.ids.homescreen.ids.loyalty.disabled = True
         time.sleep(SCAN_TIME)
+        self.manager.ids.homescreen.update_pot_buttons()
         self.manager.current = 'home'
 
 
@@ -545,6 +524,7 @@ class ShowScreen(MDScreen):
 
     def close_table(self, obj):
         self.manager.current = 'home'
+        self.manager.ids.homescreen.update_pot_buttons()
 
 
 class ShowPotsScreen(MDScreen):
@@ -573,7 +553,7 @@ class ShowPotsScreen(MDScreen):
 
     def create_pie_chart(self):
         global pots, pot_names, users_pots, pots_sheet, pots_sheet, user_name
-        self.manager.ids.homescreen.update_data()
+        self.manager.ids.homescreen.load_data()
         values = pots['Limit'].tolist()
 
         fig, ax = plt.subplots()
@@ -588,6 +568,7 @@ class ShowPotsScreen(MDScreen):
 
     def close_table(self, obj):
         self.manager.current = 'home'
+        self.manager.ids.homescreen.update_pot_buttons()
 
 
 class ShowNewScreen(MDScreen):
@@ -600,9 +581,9 @@ class SortScreen(MDScreen):
 
     #sort_layout = MDBoxLayout(orientation='vertical')
 
-    def get_transactions(self):
+    def get_unsorted(self):
         global trans
-        self.manager.ids.homescreen.update_data()
+        self.manager.ids.homescreen.load_data()
         self.unsorted_trans = trans[trans["pot"] == "None"]
         self.unsorted_trans = self.unsorted_trans[['id', 'amount', 'timestamp']]
         self.cols = self.unsorted_trans.columns.values
@@ -611,7 +592,7 @@ class SortScreen(MDScreen):
         self.unsorted_values = self.unsorted_trans.values.tolist()
 
     def load_table(self):
-        self.get_transactions()
+        self.get_unsorted()
         layout = MDBoxLayout(orientation='vertical', spacing=0.01*self.height)
         column_data = [(col, dp(10)) for col in self.cols]
         row_data = self.unsorted_values  # self.unsorted_values
@@ -629,6 +610,7 @@ class SortScreen(MDScreen):
 
     def close_table(self, obj):
         self.manager.current = 'home'
+        self.manager.ids.homescreen.update_pot_buttons()
 
     def on_row_press(self, instance_table, instance_row):
         global pots, pot_names
@@ -650,26 +632,29 @@ class SortScreen(MDScreen):
         self.dialog.open()
 
     def assign_pot(self, btn):
-        global unsorted, trans, pots, user_name, users_names
-        self.manager.ids.homescreen.update_data()
+        global unsorted, trans, pots, user_name, users_names, wb
+        self.manager.ids.homescreen.load_data()
         sort_amount = trans.loc[trans['id'] == self.selected_row_id, 'amount'].values[0]
-        assign_row = trans_sheet.find(self.selected_row_id).row
 
-        trans_sheet.update(f'C{assign_row}', btn.text)
-        self.get_transactions()
+        for row in trans_sheet.iter_rows():
+            if self.selected_row_id in row[0].value:
+                assign_row = row[0].row
+                break
+
+        trans_sheet[f'C{assign_row}'] = btn.text
+        wb.save('data.xlsx')
+        self.get_unsorted()
         pot_limit = pots[pots["Name"] == btn.text]["Limit"].values[0]
-        for j in range(len(pots_sheet.findall(btn.text))):
-            try:
-                if pots_sheet.cell(pots_sheet.findall(btn.text)[j].row, 6).value == user_name:
-                    user_pot_row = pots_sheet.findall(btn.text)[j].row
-                    pots_sheet.update(f'C{user_pot_row}', float(pots_sheet.cell(user_pot_row, 3).value) - float(sort_amount))
-                    pots_sheet.update(f'E{user_pot_row}', float(pots_sheet.cell(user_pot_row, 5).value) + 1)
-            except:
-                pass
+        for row in pots_sheet.iter_rows():
+            if btn.text in row[0].value and user_name in row[5].value:
+                user_pot_row = row[0].row
+                pots_sheet[f'C{user_pot_row}'] = pots_sheet[f'C{user_pot_row}'].value - float(sort_amount)
+                pots_sheet[f'E{user_pot_row}'] = pots_sheet[f'E{user_pot_row}'].value + 1
+                break
+
         pot_balance = pots[pots["Name"] == btn.text]["Balance"].values[0]
-        pots_sheet.update(f'D{user_pot_row}', '{:.0%}'.format(
-            round((float(pot_limit) - float(pot_balance)) / float(pot_limit), 2)))
-        self.manager.ids.homescreen.update_pot_buttons()
+        pots_sheet[f'D{user_pot_row}'] = \
+            '{:.0%}'.format( round((float(pot_limit) - float(pot_balance)) / float(pot_limit), 2))
         self.show_table()
         unsorted = trans[trans["pot"] == "None"].shape[0]
         self.manager.ids.homescreen.ids.sort.text = f"Sort({unsorted})"
@@ -678,6 +663,8 @@ class SortScreen(MDScreen):
         self.manager.ids.potpayscreen.ids.sort.text = f"Sort({unsorted})"
         self.manager.ids.potpaidscreen.ids.sort.text = f"Sort({unsorted})"
         self.dialog.dismiss()
+        wb.save('data.xlsx')
+        self.manager.ids.homescreen.update_pot_buttons()
 
     def close_dialog(self, obj):
         self.dialog.dismiss()
@@ -690,7 +677,7 @@ class NewPotScreen(MDScreen):
 
     def load_new_pot(self, newpot):
         global pots, pot_names, user_name
-        self.manager.ids.homescreen.update_data()
+        self.manager.ids.homescreen.load_data()
         if newpot in pot_names:
             button = MDRaisedButton(id=newpot, text=f'{newpot}-0% (0)')
             button.bind(on_release=lambda btn=newpot: self.manager.ids.homescreen.button_press(btn))
@@ -698,17 +685,13 @@ class NewPotScreen(MDScreen):
             self.manager.ids.homescreen.pot_layout.add_widget(button)
 
     def add_pot(self, pot_name, pot_limit):
-        global pots, pot_names
+        global pots, pot_names, wb
         if pot_limit == '':
             check_string = f'Pot limit is empty!'
         else:
             try:
                 data_entry = [pot_name, pot_limit, pot_limit, "0%", 0, user_name]
-                pots_sheet.insert_row(data_entry, len(pots_sheet.get_all_records()) + 2)
-                #with open('pots.csv', 'a', newline='') as file:
-                #    writer_object = writer(file)
-                #    writer_object.writerow(data_entry)
-                #    file.close()
+                pots_sheet.append(data_entry)
                 check_string = f"{pot_name} pot added with a limit of {pot_limit} GBP successfully"
             except:
                 check_string = "Failed to add the pot"
@@ -719,10 +702,13 @@ class NewPotScreen(MDScreen):
                                text= check_string,
                                size_hint=(0.7, 1), buttons=[close_button], disabled=True)
         self.dialog.open()
+        wb.save('data.xlsx')
+        self.manager.ids.homescreen.load_data()
 
     def close_dialog(self, obj):
-        self.manager.ids.homescreen.update_data()
+        self.manager.ids.homescreen.load_data()
         self.dialog.dismiss()
+        self.manager.current = 'showpots'
         self.manager.ids.showpotsscreen.show_table()
 
 
@@ -730,8 +716,8 @@ class NewLoyaltyScreen(MDScreen):
     loyalty_layout = StackLayout()
 
     def load_new_loyalty(self, new):
-        global loyalty, loyalty_names, user_name, loyalty_sheet, users_loyalty, user_loyalty
-        self.manager.ids.homescreen.update_data()
+        global loyalty, loyalty_names, user_name, loyalty_sheet, users_loyalty, users_loyalty
+        self.manager.ids.homescreen.load_data()
         if new in loyalty_names:
             button = MDRaisedButton(id=new, text=new)
             button.bind(on_release=lambda btn=new: self.manager.ids.loyaltyscreen.button_press(btn))
@@ -739,12 +725,13 @@ class NewLoyaltyScreen(MDScreen):
             self.manager.ids.loyaltyscreen.loyalty_layout.add_widget(button)
 
     def add_loyalty(self, loyalty_name, loyalty_code):
+        global wb, loyalty_sheet, user_name
         if len(loyalty_code) != 12:
             check_string = "Invalid loyalty code!"
         else:
             try:
                 data_entry = [loyalty_name, loyalty_code, user_name]
-                loyalty_sheet.insert_row(data_entry, len(loyalty_sheet.get_all_records()) + 2)
+                loyalty_sheet.append(data_entry)
                 check_string = f"{loyalty_name} loyalty card added successfully"
             except:
                 check_string = "Failed to add the loyalty card"
@@ -756,9 +743,11 @@ class NewLoyaltyScreen(MDScreen):
                                text= check_string,
                                size_hint=(0.7, 1), buttons=[close_button])
         self.dialog.open()
+        self.manager.ids.homescreen.load_data()
+        wb.save('data.xlsx')
 
     def close_dialog(self, obj):
-        self.manager.ids.homescreen.update_data()
+        self.manager.ids.homescreen.load_data()
         self.dialog.dismiss()
         self.manager.current = 'loyalty'
 
