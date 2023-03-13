@@ -13,19 +13,19 @@ from kivy.lang import Builder
 from kivy.core.window import Window
 from paypal import *
 import random
-from csv import writer
 import pandas as pd
 from datetime import datetime
 import time
 import string
 from barcode import EAN13
 from barcode.writer import ImageWriter
-from uuid import uuid4
 import threading
-import pygal
 import matplotlib.pyplot as plt
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 import openpyxl
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import firestore
 
 
 SCAN_TIME = 5
@@ -42,19 +42,34 @@ loyalty_name = 'None'
 loyalty_code = 111111111111
 unsorted = 0
 
-wb = openpyxl.load_workbook('data.xlsx')
+#wb = openpyxl.load_workbook('data.xlsx')
+cred = credentials.Certificate('firebase.json')
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
-trans_sheet = wb["transactions"]
-pots_sheet = wb["pots"]
-loyalty_sheet = wb["loyalty"]
-users_sheet = wb["users"]
+#trans_sheet = wb["transactions"]
+#pots_sheet = wb["pots"]
+#loyalty_sheet = wb["loyalty"]
+#users_sheet = wb["users"]
 
-users_trans = pd.read_excel('data.xlsx', sheet_name='transactions')
-users_pots = pd.read_excel('data.xlsx', sheet_name='pots')
-users_loyalty = pd.read_excel('data.xlsx', sheet_name='loyalty')
-users_data = pd.read_excel('data.xlsx', sheet_name='users')
+#users_trans = pd.read_excel('data.xlsx', sheet_name='transactions')
+#users_pots = pd.read_excel('data.xlsx', sheet_name='pots')
+#users_loyalty = pd.read_excel('data.xlsx', sheet_name='loyalty')
+#users_data = pd.read_excel('data.xlsx', sheet_name='users')
 
-users_names = users_data['username'].tolist()
+trans_sheet = db.collection(u'Transactions')
+users_trans = pd.DataFrame(list(map(lambda x: x.to_dict(), list(trans_sheet.stream()))))
+
+pots_sheet = db.collection(u'Pots')
+users_pots = pd.DataFrame(list(map(lambda x: x.to_dict(), list(pots_sheet.stream()))))
+
+loyalty_sheet = db.collection(u'Loyalty')
+users_loyalty = pd.DataFrame(list(map(lambda x: x.to_dict(), list(loyalty_sheet.stream()))))
+
+users_sheet = db.collection(u'Users')
+users_data = pd.DataFrame(list(map(lambda x: x.to_dict(), list(users_sheet.stream()))))
+
+users_names = users_data['name'].tolist()
 
 pots = pd.DataFrame()
 trans = pd.DataFrame()
@@ -121,14 +136,17 @@ class LoadScreen(MDScreen):
 class SignInScreen(MDScreen):
     def signin(self, username):
         global user_credentials, user_name, users_sheet, users_names, users_data
-        users_data = pd.read_excel('data.xlsx', sheet_name='users')
+        #users_data = pd.read_excel('data.xlsx', sheet_name='users')
+        users_data = pd.DataFrame(list(map(lambda x: x.to_dict(), list(users_sheet.stream()))))
         if username in users_names:
-            for row in users_sheet.iter_rows():
-                if username in row[0].value:
-                    user_row = row[0].row
-                    break
-            user_credentials = users_sheet.cell(row=user_row, column=3).value + \
-                               users_sheet.cell(row=user_row, column=4).value #3,4 are column numbers
+#            for row in users_sheet.iter_rows():
+#                if username in row[0].value:
+#                    user_row = row[0].row
+#                    break
+            user_credentials = users_sheet.document(f'{username}').get().to_dict()['client_id'] + \
+                               users_sheet.document(f'{username}').get().to_dict()['client_secret']
+            #user_credentials = users_sheet.cell(row=user_row, column=3).value + \
+            #                   users_sheet.cell(row=user_row, column=4).value #3,4 are column numbers
             self.manager.current = 'home'
             user_name = username
             self.manager.ids.homescreen.load_pots()
@@ -170,48 +188,63 @@ class HomeScreen(MDScreen):
         global trans_sheet, pots_sheet, loyalty_sheet, users_sheet, trans, pots, loyalty, unsorted, wb, \
             users_pots, users_trans, users_loyalty, users_data, users_names, loyalty_names, pot_names, user_name
 
-        trans_sheet = wb["transactions"]
-        pots_sheet = wb["pots"]
-        loyalty_sheet = wb["loyalty"]
-        users_sheet = wb["users"]
+        #trans_sheet = wb["transactions"]
+        #pots_sheet = wb["pots"]
+        #loyalty_sheet = wb["loyalty"]
+        #users_sheet = wb["users"]
 
-        users_trans = pd.read_excel('data.xlsx', sheet_name='transactions')
-        users_pots = pd.read_excel('data.xlsx', sheet_name='pots')
-        users_loyalty = pd.read_excel('data.xlsx', sheet_name='loyalty')
-        users_data = pd.read_excel('data.xlsx', sheet_name='users')
+        #users_trans = pd.read_excel('data.xlsx', sheet_name='transactions')
+        #users_pots = pd.read_excel('data.xlsx', sheet_name='pots')
+        #users_loyalty = pd.read_excel('data.xlsx', sheet_name='loyalty')
+        #users_data = pd.read_excel('data.xlsx', sheet_name='users')
+
+        trans_sheet = db.collection(u'Transactions')
+        users_trans = pd.DataFrame(list(map(lambda x: x.to_dict(), list(trans_sheet.stream()))))
+
+        pots_sheet = db.collection(u'Pots')
+        users_pots = pd.DataFrame(list(map(lambda x: x.to_dict(), list(pots_sheet.stream()))))
+
+        loyalty_sheet = db.collection(u'Loyalty')
+        users_loyalty = pd.DataFrame(list(map(lambda x: x.to_dict(), list(loyalty_sheet.stream()))))
+
+        users_sheet = db.collection(u'Users')
+        users_data = pd.DataFrame(list(map(lambda x: x.to_dict(), list(users_sheet.stream()))))
 
         trans = users_trans[users_trans['username'] == user_name]
         pots = users_pots[users_pots['username'] == user_name]
         loyalty = users_loyalty[users_loyalty['username'] == user_name]
 
-        pot_names = list(pots['Name'])
-        loyalty_names = list(loyalty['Name'])
-        users_names = users_data['username'].tolist()
+        pot_names = list(pots['name'])
+        loyalty_names = list(loyalty['name'])
+        users_names = users_data['name'].tolist()
         unsorted = trans[trans["pot"] == "None"].shape[0]
 
     def update_data(self):
         global pots_sheet, pot_names, wb
         for name in pot_names:
-            pot_limit = pots[pots["Name"] == name]["Limit"].values[0]
+            pot_limit = pots[pots["name"] == name]["limit"].values[0]
             try:
                 trans_spend = trans.groupby('pot').agg({'amount': ['sum', 'count']})
                 pot_spend = trans_spend.loc[name][0]
                 pot_weight = trans_spend.loc[name][1]
-                pot_limit = pots[pots["Name"] == name]["Limit"].values[0]
+                pot_limit = pots[pots["name"] == name]["limit"].values[0]
                 pot_usage = '{:.0%}'.format(float(pot_spend) / float(pot_limit))
             except:
-                pot_spend = pot_limit - pots[pots["Name"] == name]["Balance"].values[0]
-                pot_weight = pots[pots["Name"] == name]["Weight"].values[0]
-                pot_usage = pots[pots["Name"] == name]["Usage"].values[0]
+                pot_spend = pot_limit - pots[pots["name"] == name]["balance"].values[0]
+                pot_weight = pots[pots["name"] == name]["weight"].values[0]
+                pot_usage = pots[pots["name"] == name]["usage"].values[0]
+                pots_sheet.document(f'{user_name}-{name}').update({u'balance': pot_limit-pot_spend})
+                pots_sheet.document(f'{user_name}-{name}').update({u'usage': pot_usage})
+                pots_sheet.document(f'{user_name}-{name}').update({u'weight': int(pot_weight)})
 
-            for row in pots_sheet.iter_rows():
-                if name in row[0].value and user_name in row[5].value:
-                    pots_sheet[f'C{row[0].row}'] = pot_limit - pot_spend
-                    pots_sheet[f'D{row[0].row}'] = pot_usage
-                    pots_sheet[f'E{row[0].row}'] = int(pot_weight)
-                    break
+            #for row in pots_sheet.iter_rows():
+            #    if name in row[0].value and user_name in row[5].value:
+            #        pots_sheet[f'C{row[0].row}'] = pot_limit - pot_spend
+            #        pots_sheet[f'D{row[0].row}'] = pot_usage
+            #        pots_sheet[f'E{row[0].row}'] = int(pot_weight)
+            #        break
 
-        wb.save('data.xlsx')
+        #wb.save('data.xlsx')
 
     def load_pots(self):
         global unsorted, pot_names, user_name, users_pots, users_trans, trans, pots
@@ -220,15 +253,15 @@ class HomeScreen(MDScreen):
         self.update_sort_buttons()
 
         for name in pot_names:
-            pot_limit = pots[pots["Name"] == name]["Limit"].values[0]
+            pot_limit = pots[pots["name"] == name]["limit"].values[0]
             try:
                 trans_spend = trans.groupby('pot').agg({'amount': ['sum', 'count']})
                 pot_spend = trans_spend.loc[name][0]
                 pot_weight = trans_spend.loc[name][1]
                 pot_usage = '{:.0%}'.format(float(pot_spend)/float(pot_limit))
             except: # in case there are no transactions for a certain pot
-                pot_weight = pots[pots['Name'] == name]['Weight'].values[0]
-                pot_usage = pots[pots['Name'] == name]['Usage'].values[0]
+                pot_weight = pots[pots['name'] == name]['weight'].values[0]
+                pot_usage = pots[pots['name'] == name]['usage'].values[0]
 
             button = MDRaisedButton(id=name, text=f'{name}-{pot_usage} ({int(pot_weight)})')
             button.bind(on_release=lambda btn=name: self.button_press(btn))
@@ -248,20 +281,20 @@ class HomeScreen(MDScreen):
         global pay_amount, pot_selected, unsorted, pots
         self.load_data()
         pot_selected = btn.id
-        pot_weight = pots[pots['Name'] == pot_selected]['Weight'].values[0]
-        pot_usage = pots[pots['Name'] == pot_selected]['Usage'].values[0]
+        pot_weight = pots[pots['name'] == pot_selected]['weight'].values[0]
+        pot_usage = pots[pots['name'] == pot_selected]['usage'].values[0]
         self.manager.current = 'potpay'
         self.manager.ids.potpayscreen.ids.sort.text = f"Sort({unsorted})"
         self.manager.ids.potpayscreen.ids.amount.text = "Amount: " + str(pay_amount) + " GBP"
         self.manager.ids.justpayscreen.ids.amount.text = "Amount: " + str(pay_amount) + " GBP"
         self.manager.ids.potpayscreen.ids.potname.text = f'{pot_selected}-{pot_usage} ({int(pot_weight)})'
         self.manager.ids.potpaidscreen.ids.potname.text = f'{pot_selected}-{pot_usage} ({int(pot_weight)})'
-        pot_limit = str(pots[pots["Name"] == pot_selected]["Limit"].values[0])
-        self.manager.ids.potpayscreen.ids.potlimit.text = "Limit\n" + str(round(float(pot_limit), 2))
-        self.manager.ids.potpaidscreen.ids.potlimit.text = "Limit\n" + str(round(float(pot_limit), 2))
-        pot_balance = str(pots[pots["Name"] == pot_selected]["Balance"].values[0])
-        self.manager.ids.potpayscreen.ids.potrem.text = "Balance\n" + str(round(float(pot_balance), 2))
-        self.manager.ids.potpaidscreen.ids.potrem.text = "Balance\n" + str(round(float(pot_balance), 2))
+        pot_limit = str(pots[pots["name"] == pot_selected]["limit"].values[0])
+        self.manager.ids.potpayscreen.ids.potlimit.text = "limit\n" + str(round(float(pot_limit), 2))
+        self.manager.ids.potpaidscreen.ids.potlimit.text = "limit\n" + str(round(float(pot_limit), 2))
+        pot_balance = str(pots[pots["name"] == pot_selected]["balance"].values[0])
+        self.manager.ids.potpayscreen.ids.potrem.text = "balance\n" + str(round(float(pot_balance), 2))
+        self.manager.ids.potpaidscreen.ids.potrem.text = "balance\n" + str(round(float(pot_balance), 2))
         self.clear_pots()
         btn.disabled = True
         return btn.text
@@ -271,8 +304,8 @@ class HomeScreen(MDScreen):
         self.load_data()
         #pots.sort_values(by='Weight', ascending=False, inplace=True)
         for i, name in enumerate(reversed(pot_names)):
-            pot_usage = pots[pots["Name"] == name]["Usage"].values[0]
-            pot_weight = int(pots[pots["Name"] == name]["Weight"].values[0])
+            pot_usage = pots[pots["name"] == name]["usage"].values[0]
+            pot_weight = int(pots[pots["name"] == name]["weight"].values[0])
             self.pot_layout.children[i].text = f'{name}-{pot_usage} ({int(pot_weight)})'
 
     def update_sort_buttons(self):
@@ -357,25 +390,38 @@ class JustPayScreen(MDScreen):
         chars = lower + upper + numbers
         trans_id = "".join(random.choice(chars) for i in range(10))
         try:
-            data_entry = [trans_id, pay_amount, pot_selected, loyalty_code, dt_string, user_name]
-            trans_sheet.append(data_entry)
-            wb.save('data.xlsx')
+            #data_entry = [trans_id, pay_amount, pot_selected, loyalty_code, dt_string, user_name]
+            #trans_sheet.append(data_entry)
+            #wb.save('data.xlsx')
+
+            record = { 'id': trans_id, 'amount': pay_amount, 'pot': pot_selected,
+                          'loyalty': loyalty_code, 'timestamp': dt_string, 'username': user_name}
+            doc_ref = db.collection(u'Transactions').document(record['id'])
+            doc_ref.set(record)
+
             if pot_selected != "None":
-                for row in pots_sheet.iter_rows():
-                    if pot_selected in row[0].value and user_name in row[5].value:
-                        user_pot_row = row[0].row
-                        pots_sheet[f'C{row[0].row}'] = pots_sheet[f'C{row[0].row}'].value - float(pay_amount)
-                        pots_sheet[f'E{row[0].row}'] = pots_sheet[f'E{row[0].row}'].value + 1
-                        break
-                wb.save('data.xlsx')
+                balance = pots_sheet.document(f'{user_name}-{pot_selected}').get().to_dict()['balance']
+                weight = pots_sheet.document(f'{user_name}-{pot_selected}').get().to_dict()['weight']
+                pots_sheet.document(f'{user_name}-{pot_selected}').update({u'balance': balance - float(pay_amount)})
+                pots_sheet.document(f'{user_name}-{pot_selected}').update({u'weight': int(weight) + 1})
+
+                #for row in pots_sheet.iter_rows():
+                #    if pot_selected in row[0].value and user_name in row[5].value:
+                #        user_pot_row = row[0].row
+                #        pots_sheet[f'C{row[0].row}'] = pots_sheet[f'C{row[0].row}'].value - float(pay_amount)
+                #        pots_sheet[f'E{row[0].row}'] = pots_sheet[f'E{row[0].row}'].value + 1
+                #        break
+                #wb.save('data.xlsx')
                 self.manager.ids.homescreen.load_data()
-                pot_limit = str(pots[pots["Name"] == pot_selected]["Limit"].values[0])
+                pot_limit = str(pots[pots["name"] == pot_selected]["limit"].values[0])
                 self.manager.ids.potpaidscreen.ids.potlimit.text = "Limit\n" + str(round(float(pot_limit), 2))
-                pot_balance = str(pots[pots["Name"] == pot_selected]["Balance"].values[0])
+                pot_balance = str(pots[pots["name"] == pot_selected]["balance"].values[0])
                 self.manager.ids.potpaidscreen.ids.potrem.text = "Balance\n" + str(round(float(pot_balance), 2))
-                pots_sheet[f'D{user_pot_row}'] = '{:.0%}'.format(round((float(pot_limit)-float(pot_balance)) / float(pot_limit), 2))
-                pot_usage = pots[pots["Name"] == pot_selected]["Usage"].values[0]
-                pot_weight = int(pots[pots["Name"] == pot_selected]["Weight"].values[0])
+                pots_sheet.document(f'{user_name}-{pot_selected}').update({u'usage':
+                                    '{:.0%}'.format(round((float(pot_limit)-float(pot_balance)) / float(pot_limit), 2))})
+                #pots_sheet[f'D{user_pot_row}'] = '{:.0%}'.format(round((float(pot_limit)-float(pot_balance)) / float(pot_limit), 2))
+                pot_usage = pots[pots["name"] == pot_selected]["usage"].values[0]
+                pot_weight = int(pots[pots["name"] == pot_selected]["weight"].values[0])
                 self.manager.ids.potpaidscreen.ids.potname.text = f'{pot_selected}-{pot_usage} ({pot_weight})'
                 check_string = "Transaction added successfully.\n Spent " + pay_amount + \
                                " GBP\n from " + pot_selected + " Pot."
@@ -394,7 +440,7 @@ class JustPayScreen(MDScreen):
                                size_hint=(0.7, 1), buttons=[close_button, sort_button])
         self.dialog_record.open()
         self.manager.ids.homescreen.update_data()
-        wb.save('data.xlsx')
+        #wb.save('data.xlsx')
         self.manager.ids.homescreen.update_pot_buttons()
 
     def send_pay(self):
@@ -485,12 +531,12 @@ class LoyaltyScreen(MDScreen):
         self.remove_widget(self.loyalty_layout)
 
     def button_press(self, btn):
-        global loyalty_code, loyalty, users_loyalty
+        global loyalty_code, loyalty, users_loyalty, user_name
         self.manager.current = 'scan'
         self.manager.ids.scanscreen.ids.loyaltyname.text = btn.text + ' card'
-        loyalty_code = str(int(loyalty[loyalty["Name"] == btn.text]["Code"].values[0]))
+        loyalty_code = str(int(loyalty[loyalty["name"] == btn.text]["code"].values[0]))
         self.save_barcode(btn.text, loyalty_code)
-        self.manager.ids.scanscreen.ids.loyaltybarcode.source = btn.text+'.png'
+        self.manager.ids.scanscreen.ids.loyaltybarcode.source = f'barcodes/{user_name}/{btn.text}.png'
         self.clear_loyalty()
         btn.disabled = True
         return btn.text
@@ -554,7 +600,7 @@ class ShowPotsScreen(MDScreen):
     def create_pie_chart(self):
         global pots, pot_names, users_pots, pots_sheet, pots_sheet, user_name
         self.manager.ids.homescreen.load_data()
-        values = pots['Limit'].tolist()
+        values = pots['limit'].tolist()
 
         fig, ax = plt.subplots()
         ax.pie(values, labels=pot_names, autopct='%1.1f%%')
@@ -636,25 +682,29 @@ class SortScreen(MDScreen):
         self.manager.ids.homescreen.load_data()
         sort_amount = trans.loc[trans['id'] == self.selected_row_id, 'amount'].values[0]
 
-        for row in trans_sheet.iter_rows():
-            if self.selected_row_id in row[0].value:
-                assign_row = row[0].row
-                break
+        trans_sheet.document(f'{self.selected_row_id}').update({u'pot': btn.text})
 
-        trans_sheet[f'C{assign_row}'] = btn.text
-        wb.save('data.xlsx')
+        #trans_sheet[f'C{assign_row}'] = btn.text
+        #wb.save('data.xlsx')
         self.get_unsorted()
-        pot_limit = pots[pots["Name"] == btn.text]["Limit"].values[0]
-        for row in pots_sheet.iter_rows():
-            if btn.text in row[0].value and user_name in row[5].value:
-                user_pot_row = row[0].row
-                pots_sheet[f'C{user_pot_row}'] = pots_sheet[f'C{user_pot_row}'].value - float(sort_amount)
-                pots_sheet[f'E{user_pot_row}'] = pots_sheet[f'E{user_pot_row}'].value + 1
-                break
+        pot_limit = pots[pots["name"] == btn.text]["limit"].values[0]
+        balance = pots_sheet.document(f'{user_name}-{btn.text}').get().to_dict()['balance']
+        weight = pots_sheet.document(f'{user_name}-{btn.text}').get().to_dict()['weight']
+        pots_sheet.document(f'{user_name}-{btn.text}').update({u'balance': balance - float(sort_amount)})
+        pots_sheet.document(f'{user_name}-{btn.text}').update({u'weight': int(weight) + 1})
 
-        pot_balance = pots[pots["Name"] == btn.text]["Balance"].values[0]
-        pots_sheet[f'D{user_pot_row}'] = \
-            '{:.0%}'.format( round((float(pot_limit) - float(pot_balance)) / float(pot_limit), 2))
+        #for row in pots_sheet.iter_rows():
+        #    if btn.text in row[0].value and user_name in row[5].value:
+        #        user_pot_row = row[0].row
+        #        pots_sheet[f'C{user_pot_row}'] = pots_sheet[f'C{user_pot_row}'].value - float(sort_amount)
+        #        pots_sheet[f'E{user_pot_row}'] = pots_sheet[f'E{user_pot_row}'].value + 1
+        #        break
+
+        pot_balance = pots[pots["name"] == btn.text]["balance"].values[0]
+        pots_sheet.document(f'{user_name}-{btn.text}').update({u'usage':
+                            '{:.0%}'.format( round((float(pot_limit) - float(pot_balance)) / float(pot_limit), 2))})
+        #pots_sheet[f'D{user_pot_row}'] = \
+        #    '{:.0%}'.format( round((float(pot_limit) - float(pot_balance)) / float(pot_limit), 2))
         self.show_table()
         unsorted = trans[trans["pot"] == "None"].shape[0]
         self.manager.ids.homescreen.ids.sort.text = f"Sort({unsorted})"
@@ -663,7 +713,7 @@ class SortScreen(MDScreen):
         self.manager.ids.potpayscreen.ids.sort.text = f"Sort({unsorted})"
         self.manager.ids.potpaidscreen.ids.sort.text = f"Sort({unsorted})"
         self.dialog.dismiss()
-        wb.save('data.xlsx')
+        #wb.save('data.xlsx')
         self.manager.ids.homescreen.update_pot_buttons()
 
     def close_dialog(self, obj):
@@ -690,9 +740,13 @@ class NewPotScreen(MDScreen):
             check_string = f'Pot limit is empty!'
         else:
             try:
-                data_entry = [pot_name, pot_limit, pot_limit, "0%", 0, user_name]
-                pots_sheet.append(data_entry)
+                #data_entry = [pot_name, pot_limit, pot_limit, "0%", 0, user_name]
+                #pots_sheet.append(data_entry)
                 check_string = f"{pot_name} pot added with a limit of {pot_limit} GBP successfully"
+                record = {'name': pot_name, 'limit': pot_limit, 'balance': pot_limit,
+                          'usage': "0%", 'weight': 0, 'username': user_name}
+                doc_ref = pots_sheet.document(record['username']+'-'+record['name'])
+                doc_ref.set(record)
             except:
                 check_string = "Failed to add the pot"
 
@@ -702,7 +756,7 @@ class NewPotScreen(MDScreen):
                                text= check_string,
                                size_hint=(0.7, 1), buttons=[close_button], disabled=True)
         self.dialog.open()
-        wb.save('data.xlsx')
+        #wb.save('data.xlsx')
         self.manager.ids.homescreen.load_data()
 
     def close_dialog(self, obj):
@@ -730,9 +784,12 @@ class NewLoyaltyScreen(MDScreen):
             check_string = "Invalid loyalty code!"
         else:
             try:
-                data_entry = [loyalty_name, loyalty_code, user_name]
-                loyalty_sheet.append(data_entry)
+                #data_entry = [loyalty_name, loyalty_code, user_name]
+                #loyalty_sheet.append(data_entry)
                 check_string = f"{loyalty_name} loyalty card added successfully"
+                record = {'name': loyalty_name, 'code': loyalty_code, 'username': user_name}
+                doc_ref = loyalty_sheet.document(record['username'] + '-' + record['name'])
+                doc_ref.set(record)
             except:
                 check_string = "Failed to add the loyalty card"
                 self.ids.confirm.disabled = True
@@ -744,7 +801,7 @@ class NewLoyaltyScreen(MDScreen):
                                size_hint=(0.7, 1), buttons=[close_button])
         self.dialog.open()
         self.manager.ids.homescreen.load_data()
-        wb.save('data.xlsx')
+        #wb.save('data.xlsx')
 
     def close_dialog(self, obj):
         self.manager.ids.homescreen.load_data()
